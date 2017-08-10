@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="refresh" content="2000">
+<title>Insert title here</title>
+</head>
+<body>
+	<style>	
+		.axis path,
+		.axis line{
+			fill: none;
+			stroke: black;
+			shape-rendering: crispEdges;
+		}
+	
+		.axis text {
+			font-family: sans-serif;
+			font-size: 11px;
+		}
+		
+		.Path {
+			font-size: 11px;
+		}
+	
+		.MyRect {
+		}
+		
+		.MyRect1 {
+		}
+	
+		.MyText {
+			fill: black;
+			font-size: 10px;
+			text-anchor: middle;
+		}
+	</style>
+	
+	<div class="container-fluid">
+		<h3 id="reportpath" class="Report">Stock</h3>
+		<div class="row">
+			
+			<div class="col-sm-2" style="background-color:lavender;">
+				<label for="stock">StockId: </label>
+				<select class="form-control" id="stockIdSelect">
+				</select>
+			</div>
+			
+			<input type="button" value="showStock" onclick="showStock()" ID="Button1" NAME="Button1">
+						
+			<div class="col-sm-2" style="background-color:lavender;">
+				<label for="market">MarketId: </label>
+				<select class="form-control" id="marketIdSelect">
+				</select>
+			</div>
+			
+			<input type="button" value="showMarket" onclick="showMarket()" ID="Button2" NAME="Button2">
+			
+			<div class="col-sm-2" style="background-color:lavender;">
+				<label for="interval">Interval:</label>
+				<select class="form-control" id="interval">
+					<option value="1min">1MIN</option>
+					<option value="5min">5MIN</option>
+					<option value="15min">15MIN</option>
+					<option value="30min">60MIN</option>
+					<option value="1hour">DAY</option>
+				</select>
+			</div>
+			
+			<div class="col-sm-2" style="background-color:lavender;">
+				<label for="duration">Duration:</label>
+				<select class="form-control" id="duration">
+					<option value="30min">30MIN</option>
+					<option value="60min">60MIN</option>
+					<option value="1DAY">1DAY</option>
+					<option value="5DAY">5DAY</option>
+				</select>
+			</div>
+						
+		</div>
+	</div>
+
+	
+	<script src="/Users/yanbinwa/Documents/workspace/StockAppGUI/d3.js" charset="utf-8"></script>
+	<script src="/Users/yanbinwa/Documents/workspace/StockAppGUI/jquery.min.js"></script>
+	<script src="/Users/yanbinwa/Documents/workspace/StockAppGUI/src/json2.js" charset="utf-8"></script> 
+        <script> 
+        	
+	        var width = 1400;
+	    	var height = 300;
+	    	var padding = {left:60, right:50, top:30, bottom:30}
+	    	
+	    	var svg = d3.select("body")
+	        	.append("svg")
+	        	.attr("width", width)
+	        	.attr("height", height)
+	        	
+	        var svg1 = d3.select("body")
+	        	.append("svg")
+	        	.attr("width", width)
+	        	.attr("height", height)
+	        	
+	        var indexLimit = 60;
+	        	
+	    	var clearSelect = function(id)
+	    	{
+	    		var allSelect = document.getElementById(id);
+	    		if (allSelect == null)
+	    		{
+	    			return;
+	    		}
+	    		var optionArr = allSelect.getElementsByTagName("option");
+	    		for(var i = 0; i < optionArr.length; i ++)
+	    		{
+	    			allSelect.remove(optionArr[i]);
+	    		}
+	    	}
+	    	
+	    	Date.prototype.Format = function (fmt) { 
+	    	    var o = {
+	    	        "M+": this.getMonth() + 1,
+	    	        "d+": this.getDate(),
+	    	        "h+": this.getHours(),
+	    	        "m+": this.getMinutes(),
+	    	        "s+": this.getSeconds(),
+	    	        "q+": Math.floor((this.getMonth() + 3) / 3),
+	    	        "S": this.getMilliseconds()
+	    	    };
+	    	    if (/(y+)/.test(fmt)) fmt = fmt.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+	    	    for (var k in o)
+	    	    if (new RegExp("(" + k + ")").test(fmt)) fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (o[k]) : (("00" + o[k]).substr(("" + o[k]).length)));
+	    	    return fmt;
+	    	}
+	    	
+	        var updataStockId = function() {
+	        	
+	        	var url = "http://localhost:8080/info?query=stock";
+	        	$.ajax({
+  		        	url: url, 
+  		        	success: function(result){
+  		        		if(result != "error" && result.trim().length > 0)
+  		        		{
+  		        			clearSelect("stockIdSelect");
+  		        			var stockIdList = JSON.parse(result);
+  		        			var stockIdSelete = document.getElementById("stockIdSelect");
+  		        			for(var i = 0; i < stockIdList.length; i ++)
+  		        			{
+  		        				var opt = new Option(stockIdList[i], stockIdList[i]);
+  		        				stockIdSelete.options.add(opt);
+  		        			}
+  		        		}
+  		        	},
+  		        	error: function() {
+  		        	}
+  		        });
+	        }
+	    	
+	    	var updataMarketId = function() {
+	    		
+	        	var url = "http://localhost:8080/info?query=market";
+	        	$.ajax({
+  		        	url: url, 
+  		        	success: function(result){
+  		        		if(result != "error" && result.trim().length > 0)
+  		        		{
+  		        			clearSelect("marketIdSelect");
+  		        			var marketIdList = JSON.parse(result);
+  		        			var marketIdSelete = document.getElementById("marketIdSelect");
+  		        			for(var i = 0; i < marketIdList.length; i ++)
+  		        			{
+  		        				var opt = new Option(marketIdList[i], marketIdList[i]);
+  		        				marketIdSelete.options.add(opt);
+  		        			}
+  		        		}
+  		        	},
+  		        	error: function() {
+  		        	}
+  		        });
+	        }
+	    	
+	    	var showStock = function() {
+	    		var id = $('#stockIdSelect option:selected').val();
+	    		var interval = $('#interval option:selected').val();
+	    		var duration = $('#duration option:selected').val();
+	    		
+	    		var currentTime = new Date().getTime();
+	    	    var mode = 60 * 1000;
+	    	    
+	    	    if (duration == '30min')
+	    	    {
+	    	    	mode = mode * 30;
+	    	    }
+	    	    else if (duration == '60min')
+	    	    {
+	    	    	mode = mode * 60;
+	    	    }
+	    	    else if (duration == '1DAY')
+	    	    {
+	    	    	mode = mode * 60 * 24;
+	    	    }
+	    	    else if (duration == '5DAY')
+	    	    {
+	    	    	mode = mode * 60 * 24 * 5;
+	    	    }
+	    	      
+     	        var params = {
+    	                "id" : id,
+    	                "startTimestamp" : (currentTime - mode),
+    	                "endTimestamp" : currentTime,
+    	                "interval" : interval,
+    	                "type" : "stock"
+    	        	};
+    	        updateChart(params);
+	    	}
+	    	
+	    	var showMarket = function() {
+	    		var id = $('#marketIdSelect option:selected').val();
+	    		var interval = $('#interval option:selected').val();
+				var duration = $('#duration option:selected').val();
+	    		
+	    		var currentTime = new Date().getTime();
+	    	    var mode = 60 * 1000;
+	    	    
+	    	    if (duration == '30min')
+	    	    {
+	    	    	mode = mode * 30;
+	    	    }
+	    	    else if (duration == '60min')
+	    	    {
+	    	    	mode = mode * 60;
+	    	    }
+	    	    else if (duration == '1DAY')
+	    	    {
+	    	    	mode = mode * 60 * 24;
+	    	    }
+	    	    else if (duration == '5DAY')
+	    	    {
+	    	    	mode = mode * 60 * 24 * 5;
+	    	    }
+	    	      
+     	        var params = {
+    	                "id" : id,
+    	                "startTimestamp" : (currentTime - mode),
+    	                "endTimestamp" : currentTime,
+    	                "interval" : interval,
+    	                "type" : "market"
+    	        	}; 
+    	        updateChart(params);
+	    	}
+	        	
+        	var updateChart = function(params) {
+        		var url = "http://localhost:8080/report?query=";
+    	        url += JSON.stringify(params); 
+    	        
+    	        $.ajax({
+  		        	url: url, 
+  		        	success: function(result){
+  		        		if(result != "error" && result.trim().length > 0)
+  		        		{
+  		        			var stockDataList = JSON.parse(result);
+  		        			drawChart(stockDataList);
+  		        		}
+  		        	},
+  		        	error: function() {
+  		        	}
+  		        });   
+        	}
+        	
+        	var clearSvg = function()
+        	{
+        		svg.selectAll("*").remove();
+        		svg1.selectAll("*").remove();
+        	}
+	        
+	        var drawChart = function(stockDataList) {
+	        	
+	        	if(stockDataList.length == 0)
+	        	{
+	        		return;	
+	        	}
+	        	if(stockDataList.length > indexLimit)
+	        	{
+	        		stockDataList = stockDataList.slice(stockDataList.length - indexLimit);
+	        	}
+	        	var timestampList = [];
+	        	var totalNumberList = [];
+	        	for(var i = 0; i < stockDataList.length; i ++)
+	        	{
+	        		if (i % 5 == 0)
+	        		{
+	        			timestampList.push(stockDataList[i]["timestamp"]);
+	        		}
+	        		totalNumberList.push(stockDataList[i]["totalNumber"]);
+	        	}
+	        	
+	        	clearSvg();	
+	        	var start
+	        	var min = stockDataList[0]["lprice"];
+	        	var max = stockDataList[0]["hprice"];
+	        	var maxDealNumber = stockDataList[0]["totalNumber"];
+	        	for (var i = 1; i < stockDataList.length; i ++)
+		        {
+		        	if (stockDataList[i]["lprice"] < min)
+		        	{
+		        		min = stockDataList[i]["lprice"];
+		        	}
+		        	if (stockDataList[i]["hprice"] > max)
+		        	{
+		        		max = stockDataList[i]["hprice"];
+		        	}
+		        	if (stockDataList[i]["totalNumber"] > maxDealNumber)
+		        	{
+		        		maxDealNumber = stockDataList[i]["totalNumber"];
+		        	}
+		        }
+
+	        	var xScale = d3.scale.ordinal()
+		        	.domain(d3.range(indexLimit))
+		        	.rangeRoundBands([0, width - padding.left - padding.right]);
+	        	
+		        var yScale = d3.scale.linear()
+		        	.domain([min - (max - min) / 20, max + (max - min) / 20])
+		        	.range([height - padding.top - padding.bottom, 0]);
+		        
+		        var yScale1 = d3.scale.linear()
+		        	.domain([0, maxDealNumber])
+		        	.range([height - padding.top - padding.bottom, 0]);
+		        
+		        var xAxis = d3.svg.axis()
+		        	.scale(xScale)
+		        	.orient("bottom")
+		        	
+		        var xAxis1 = d3.svg.axis()
+		        	.scale(xScale)
+		        	.orient("bottom")
+		        	
+		        var format = ',.2f';
+		        var yAxis = d3.svg.axis()
+		        	.scale(yScale)
+		        	.orient("left")
+		        	.tickFormat(d3.format(format));
+		        
+		        var yAxis1 = d3.svg.axis()
+		        	.scale(yScale1)
+		        	.orient("left")
+		        	
+		        var rectPadding = 4;
+		        		        
+		        var rects = svg.selectAll(".MyRect")
+		        	.data(stockDataList)
+		        	.enter()
+		        	.append("rect")
+		        	.attr("class", "MyRect")
+		        	.attr("transform", "translate(" + padding.left + ',' + padding.top + ")")
+		        	.attr("x", function(d, i) {
+		        		return xScale(i) + rectPadding/2;
+		        	})
+		        	.attr("width", xScale.rangeBand() - rectPadding)
+		        	.attr("y", function(d) {
+		        		return yScale(d3.max([d["startPrice"], d["endPrice"]]));
+		        	})
+		        	.attr("height", function(d){
+		        		if (d["startPrice"] ==  d["endPrice"])
+		        		{
+		        			return 3;
+		        		}
+		        		return yScale(d3.min([d["startPrice"], d["endPrice"]])) - yScale(d3.max([d["startPrice"], d["endPrice"]])) + 1;
+		        	})
+		        	.attr("fill", function(d){
+		        		if (d["startPrice"] < d["endPrice"])
+		        		{
+		        			return "red";
+		        		}
+		        		else if (d["startPrice"] > d["endPrice"])
+		        		{
+		        			return "green";
+		        		}
+		        		else
+		        		{
+		        			return "black";
+		        		}
+		        	});
+		        
+		        var lines = svg.selectAll("line")
+		        	.data(stockDataList)
+		        	.enter()
+		        	.append("line")
+		        	.attr("transform", "translate(" + padding.left + ',' + padding.top + ")")
+		        	.attr("x1", function(d, i) {
+		        		return xScale(i) + xScale.rangeBand() / 2;
+		        	})
+		        	.attr("x2", function(d, i) {
+		        		return xScale(i) + xScale.rangeBand() / 2;
+		        	})
+		        	.attr("y1", function(d, i) {
+		        		return yScale(d["hprice"]);
+		        	})
+		        	.attr("y2", function(d, i) {
+		        		return yScale(d["lprice"]);
+		        	})
+		        	.style("stroke", function(d){
+		        		if (d["startPrice"] < d["endPrice"])
+		        		{
+		        			return "red";
+		        		}
+		        		else if (d["startPrice"] > d["endPrice"])
+		        		{
+		        			return "green";
+		        		}
+		        		else
+		        		{
+		        			return "black";
+		        		}
+		        	})
+					.style("stroke-width", 3);
+		        
+		        var texts = svg.selectAll(".MyText")
+		        	.data(timestampList)
+		        	.enter()
+		        	.append("text")
+		        	.attr("class", "MyText")
+		        	.attr("transform", "translate(" + padding.left + ',' + padding.top + ")")
+		        	.attr("x", function(d, i) {
+		        		return xScale(i * 5) + rectPadding/2;
+		        	})
+		        	.attr("y", function() {
+		        		var min = yScale.domain()[1];
+		        		return yScale(min);
+		        	})
+		        	.attr("dx", function(){
+		        		return (xScale.rangeBand() - rectPadding) / 2;
+		        	})
+		        	.attr("dy", function(){
+		        		return -10;
+		        	})
+		        	.text(function(d, i) {
+		        		return new Date(d).Format("MM/dd hh:mm");
+		        	});
+		        
+		        svg.append("g")
+			        .attr("class","axis")
+			        .attr("transform","translate(" + padding.left + "," + (height - padding.bottom) + ")")
+			        .call(xAxis); 
+		              
+				svg.append("g")
+					.attr("class","axis")
+					.attr("transform","translate(" + padding.left + "," + padding.top + ")")
+					.call(yAxis);
+				
+				var rects1 = svg1.selectAll(".MyRect1")
+		        	.data(stockDataList)
+		        	.enter()		        	
+		        	.append("rect")
+		        	.attr("class", "MyRect1")
+		        	.attr("transform", "translate(" + padding.left + ',' + padding.top + ")")
+		        	.attr("x", function(d, i) {
+		        		return xScale(i) + rectPadding/2;
+		        	})
+		        	.attr("width", xScale.rangeBand() - rectPadding)
+		        	.attr("y", function(d) {
+		        		console.log(d["totalNumber"]);
+		        		return yScale1(d["totalNumber"]);
+		        	})
+		        	.attr("height", function(d){
+		        		return height - padding.top - padding.bottom - yScale1(d["totalNumber"]);
+		        	})
+		        	.attr("fill", function(d){
+		        		if (d["startPrice"] < d["endPrice"])
+		        		{
+		        			return "red";
+		        		}
+		        		else if (d["startPrice"] > d["endPrice"])
+		        		{
+		        			return "green";
+		        		}
+		        		else
+		        		{
+		        			return "black";
+		        		}
+		        	});
+				
+				svg1.append("g")
+			        .attr("class","axis")
+			        .attr("transform","translate(" + padding.left + "," + (height - padding.bottom) + ")")
+			        .call(xAxis1); 
+	              
+				svg1.append("g")
+					.attr("class","axis")
+					.attr("transform","translate(" + padding.left + "," + (padding.top) + ")")
+					.call(yAxis1);
+				
+	        }
+	        
+	        window.onload = function()
+	        {
+	        	updataStockId();
+		        updataMarketId();
+	        }
+	       	
+        </script> 
+</body>
+</html>

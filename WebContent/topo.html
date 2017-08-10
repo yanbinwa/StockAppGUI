@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Network topo graph using D3.js</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+
+<link href="./lib/css/bootstrap.min.css" rel="stylesheet">
+<script src="./lib/js/d3.v3.js"></script>
+<script src="./lib/js/jquery.min.js"></script>
+
+<style type="text/css">
+
+	html,body,div
+	{
+	    height: 100%;
+	}
+
+	.centerPanel {
+	    background: #FEFEFE;
+	    float:left;
+	    width: 80%;
+	}
+	.rightPanel {
+	    background:#DDDDDD;
+	    overflow: hidden;
+	    padding: 10px;
+	}
+
+	.node circle {
+	    fill: #fff;
+	    stroke: steelblue;
+	    stroke-width: 3px;
+	}
+
+	.node text { font: 8 px sans-serif; }
+
+	.active {
+		stroke: #00c;
+    }
+
+</style>
+</head>
+
+<body>
+
+<div id="topology" class="centerPanel"></div>
+<div id="objectInfo" class="rightPanel">
+	<h2>Information</h2>
+    <div id="errorInfo"></div>
+</div>
+
+<script type="text/javascript">
+
+	//Alarm leval color mapping
+	var statusMap = {
+		"Up": "#59A814",
+		"Down": "#BC1A0D",
+		"Unknown": "#00CCFF",
+		"Critical": "#BC1A0D",
+		"Major": "#EF721C",
+		"Minor": "#FEAC21",
+		"Warning": "#0000FF",
+		"Informational": "#00CCFF",
+		"Normal": "#59A814",
+		"None" : "black"
+	};
+
+	//Markers
+	var linkArrowShake = [
+	{ id: 'circle', path: 'M 0, 0  m -5, 0  a 5,5 0 1,0 10,0  a 5,5 0 1,0 -10,0', viewbox: '-6 -6 12 12' }
+	, { id: 'square', path: 'M 0,0 m -5,-5 L 5,-5 L 5,5 L -5,5 Z', viewbox: '-5 -5 10 10' }
+	, { id: 'arrow', path: 'M 0 0 L 10 5 L 0 10 z', viewbox: '0 0 10 10' }
+	, { id: 'stub', path: 'M 0,0 m -1,-5 L 1,-5 L 1,5 L -1,5 Z', viewbox: '-1 -5 2 10' }
+	]
+
+	// node and links map
+	var nodes = {};
+	var links = {};
+	var roots = [];
+
+	//Graph params
+	var width = 1200;
+	var height = 1200;
+	var linkDistance = 300;
+	var circleR = 12;
+
+	var node = null;
+	var link = null;
+	var force = null;
+	var nodelinks = null;
+	var sourceStatus = null;
+	var colorType = {
+	    	"saturate" : "saturate"
+	    };
+
+	var getGraph_url = "http://10.74.125.207:8080/APIGateway/APIServlet?action=getGraphData";
+	var getNode_url = "http://10.74.125.207:8080/APIGateway/APIServlet?action=getNodeInfo";
+
+	//auto layout by root node
+	function horizontalTreeLayout (root) {
+		var children = [];
+		for (var i = 0; i < links.length; i++) {
+			var link = links[i];
+			if (link.source.id == root.id) {
+				var child = nodes[link.target.id];
+				children.push(child);
+			}
+		}
+
+		var middle = Math.round(children.length / 2) - 1;
+
+		for (var i = 0; i < children.length; i++) {
+			children[i].px = root.px + 150;
+			children[i].x = root.x + 150;
+			children[i].py = root.py + (i - middle) * 50;
+			children[i].y = root.y + (i - middle) * 50;
+			horizontalTreeLayout(children[i]);
+		}
+	};
+
+	//draw graph
+	function drawNetworkTopology(data) {
+	    // Compute the distinct nodes from the links.
+	    data.graph.nodes.forEach(function(node) {
+	    	nodes[node.id] = node;
+	    	if (node.properties && node.properties.groot) {
+	    		roots.push(node);
+	    	}
+	    });
+
+	    links = data.graph.links;
+	    links.forEach(function(link) {
+	        link.source = nodes[link.source];
+	        link.target = nodes[link.target];
+	    });
+
+	    //layout
+		force = d3.layout.force().nodes(data.graph.nodes).links(links)
+		          .linkDistance(linkDistance).charge(-600).size([width, height]).start();
+
+		var zoom = d3.behavior.zoom().scaleExtent([1, 2]).on("zoom", zoomed);
+		var drag = d3.behavior.drag().on("dragstart", dragstarted).on("drag", dragged).on("dragend", dragended);
+		var svg = d3.select("div#topology").append("svg").attr("viewBox", "0 0 " + width + " " + height).attr("preserveAspectRatio", "xMidYMid meet").call(zoom);
+
+		svg.append("text").text("").attr({
+			'x' : width - 70,
+			'y' : height - 5,
+			"text-anchor" : "middle"
+		});
+
+		svg.append("rect").attr({
+			"width" : width,
+			"height" : height
+		})
+		.style({
+			"fill" : "none"
+		});
+
+		defs = svg.append("svg:defs");
+		var marker = defs.selectAll('marker').data(linkArrowShake).enter()
+			.append("svg:marker")
+				.attr({
+					"id": function(d) { return d.id;},
+					"viewBox": function(d) { return d.viewbox;},
+					"refX": "0",
+					"refY": "5",
+					"markerWidth": "4",
+					"markerHeight": "3",
+					"orient": "auto"
+				})
+			.append('path')
+				.attr('d', function(d) { 
+					return d.path; 
+				})
+				.attr('fill', function(d) { 
+					var status = d.status ? d.status : "None";
+					return statusMap[status]; 
+				});
+
+		//root graph
+		var containerGrp = svg.append("g");
+
+		link = containerGrp.selectAll("line").data(links).enter()
+		.append("line").attr({
+			"stroke-width" : 3,
+			"stroke" : function(d) { 
+		          	var status = d.status ? d.status : "None";
+		          	return statusMap[status]; 
+		          },
+			"marker-end":"url(#arrow)",
+		});
+
+		node = containerGrp.selectAll(".node").data(data.graph.nodes).enter()
+		.append("g").attr({
+			"d": function (d) {
+				d.fixed = true;
+				return d.id;
+			},
+			"class" : "nodes",
+			"cx" : function (d) {
+				return d.x;
+			},
+			"cy" : function (d) {
+				return d.y;
+			}
+		})
+		.call(drag);
+
+	    node.append("circle")
+			.attr("r", function(d) { 
+				return circleR; 
+			})
+			.style("fill", function(d) {
+				var status = d.status ? d.status : "Normal";
+				return statusMap[status]; 
+			})
+			.on("click", mouseclick)
+			.on("dblclick", mousedblclick)
+			.on("mouseover", mouseOverFunction)
+			.on("mouseout", mouseOutFunction);
+
+		node.append("text")
+			.attr({
+				"y" : 25,
+				"text-anchor" : "middle"
+			})
+			.text(function(d) {
+				return d.id;
+			});
+
+		force.on("tick", tick);
+
+		var tooltip = d3.select("body").append("div").attr("class", "tooltip").style({"opacity": 0, "padding":"5px", "border-radius": "5px", "height" : "100px", "min-width": "100px", "background": "#DDDDDD"});
+
+
+		function mouseOverFunction(d, i) {
+			if (d3.event.defaultPrevented) {
+				return;
+			}
+			tooltip.transition().duration(200).style("opacity", 1);
+			tooltip.html(infoMationHtml(d)).style({
+				"left": (d3.event.pageX + 20) + "px",
+				"top": (d3.event.pageY + 20) + "px"
+			});
+		}
+
+		function mouseOutFunction() {
+			if (d3.event.defaultPrevented) {
+				return;
+			}
+			tooltip.transition().duration(500).style("opacity", 0);
+		}
+
+		// action to take on mouse click
+		function mouseclick(d, i) {
+			//unselect all nodes
+			containerGrp.selectAll("circle").classed("active", false);
+
+			//high linght selected node
+			var selected = containerGrp.selectAll("circle").filter(function(dd, i) {
+				return dd && (d.id == dd.id);
+			});
+			if (selected.length > 0) {
+				selected.classed("active", true);
+			}
+
+			var selectedNode = data.graph.nodes[i];
+
+			var time = (new Date()).getTime() - 30 * 24 * 3600 * 1000;
+			var params = {
+		        "host" : selectedNode.id,
+		        "timestamp" : time
+	      	};
+			      
+			$.ajax({
+				url: getNode_url, 
+				data: params,
+				success: function(result) {
+					var msg = '';
+					for (var j = 0; j < result.state.length; j++) {
+						var  message = result.state[j];
+						var timeStr = message[0];
+						var status = message[1];
+						msg += new Date(timeStr) + ": " + status+ "<BR/>";
+					}
+
+					var level = statusMap[selectedNode.status];
+				    
+				    var infoHtml = infoMationHtml(selectedNode);
+				    if (msg) {
+				    	infoHtml += "<BR/><b>Message Text:</b><BR/> <font color=" + level + ">" + msg + "</font>";
+				    }
+
+					//display info message
+					d3.select("div#errorInfo").html(infoHtml)
+				}
+			});
+		}
+
+		function infoMationHtml (selectedNode) {
+			var infoHtml = "";
+			if (selectedNode.properties) {
+				infoHtml = "<b>GID:</b>" + selectedNode.properties.gid;
+		        if (selectedNode.properties.gvtype) {
+		        	infoHtml += "<BR/><b>Type:</b>" + selectedNode.properties.gvtype;
+		        }
+		        if (selectedNode.properties.address) {
+		        	infoHtml += "<BR/><b>Address:</b>" + selectedNode.properties.address;
+		        }
+		        if (selectedNode.properties.serial) {
+		        	infoHtml += "<BR/><b>Serial:</b>" + selectedNode.properties.serial;
+		        }
+		        
+			}
+			if (selectedNode.status) {
+		        infoHtml += "<BR/><b>Status:</b>" + selectedNode.status;
+		    }
+			
+	        return infoHtml;
+		}
+		 
+		// action to take on mouse double click
+		function mousedblclick(d, i) {
+
+		}
+
+		function tick() {
+			node.attr({
+				"cx" : function(d) {
+					return d.x = Math.max(15, Math.min(width - 15, d.x));
+				},
+				"cy" : function(d) {
+					return d.y = Math.max(15, Math.min(height - 15, d.y));
+				},
+				"transform" : function(d) {
+					return "translate(" + d.x + "," + d.y + ")";
+				}
+			});
+
+			link.attr({
+				"x1" : function(d) {
+					return d.source.x;
+				},
+				"y1" : function(d) {
+					return d.source.y;
+				},
+				"x2" : function(d) {
+					var x1 = d.source.x;
+					var y1 = d.source.y;
+					var x2 = d.target.x;
+					var y2 = d.target.y;
+					var cos = (x2 - x1) / Math.sqrt(Math.pow((x1 - x2), 2) + Math.pow((y1 - y2), 2));
+
+					return x2 - (circleR + 8) * cos;
+				},
+				"y2" : function(d) {
+					var x1 = d.source.x;
+					var y1 = d.source.y;
+					var x2 = d.target.x;
+					var y2 = d.target.y;
+					var sin = (y2 - y1) / Math.sqrt(Math.pow((x1 - x2), 2) + Math.pow((y1 - y2), 2));
+
+					return y2 - (circleR + 8) * sin;
+				}
+			});
+		}
+
+		function zoomed() {
+			var e = d3.event;
+			var tx = Math.min(0, Math.max(e.translate[0], width - width * e.scale));
+			var ty = Math.min(0, Math.max(e.translate[1], height - height * e.scale));
+
+			zoom.translate([tx, ty]);
+			containerGrp.attr("transform", ["translate(" + [tx, ty] + ")", "scale(" + e.scale + ")"].join(" "));
+		}
+
+		function dragstarted(d, i) {
+			force.stop();
+		}
+
+		function dragged(d, i) {
+			d.px += d3.event.dx;
+			d.py += d3.event.dy;
+			d.x += d3.event.dx;
+			d.y += d3.event.dy;
+			tick();
+
+			if (d3.event.sourceEvent.altKey) {
+				horizontalTreeLayout(d);
+			}
+		}
+
+		function dragended(d, i) {
+			d.fixed = true;
+			tick();
+			force.resume();
+
+			if (d3.event.sourceEvent.altKey) {
+				horizontalTreeLayout(d);
+			}
+		}
+
+	};
+	      
+	$.ajax({
+	  url: getGraph_url, 
+	  success: function(result){
+	  	drawNetworkTopology(result);
+
+		//init root position
+		if (roots.length > 0) {
+			for (var i = 0; i < roots.length; i++) {
+				var root = roots[0];
+				root.px = 100;
+				root.py = 300 * (i + 1);
+				root.x = 100;
+				root.y = 300 * (i + 1);
+				horizontalTreeLayout(root);
+			}
+		}
+	  }
+	});
+
+
+</script>
+</body>
+
+</html>

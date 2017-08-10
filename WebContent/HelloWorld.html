@@ -1,0 +1,22 @@
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>HelloWorld</title>
+	</head>
+	<body>
+		<p>Apple</p>
+		<p>Pear</p>
+		<p>Banana</p>
+		<script src="/Users/yanbinwa/Documents/workspace/StockAppGUI/d3.js" charset="utf-8"></script> 
+        <script>  
+        	var body = d3.select("body");
+        	var p = body.selectAll("p");
+        	var str = "china";
+        	p.datum(str);
+        	str = "beijing";
+        	p.text(function(d, i) {
+        		return "the " + i + " is " + d;
+        	});
+        </script> 
+	</body>
+</html>

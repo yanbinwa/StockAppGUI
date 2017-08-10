@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+</head>
+<body>
+	<style>	
+		.axis path,
+		.axis line{
+			fill: none;
+			stroke: black;
+			shape-rendering: crispEdges;
+		}
+	
+		.axis text {
+			font-family: sans-serif;
+			font-size: 11px;
+		}
+	
+		.MyRect {
+			fill: steelblue;
+		}
+	
+		.MyText {
+			fill: white;
+			text-anchor: middle;
+		}
+	</style>
+	<script src="/Users/yanbinwa/Documents/workspace/StockAppGUI/d3.js" charset="utf-8"></script> 
+        <script>  
+        
+        	var width = 400;
+        	var height = 400;
+        	
+	        var svg = d3.select("body")
+	        	.append("svg")
+	        	.attr("width", width)
+	        	.attr("height", height)
+	        	
+	        var circle1 = svg.append("circle")
+	        	.attr("cx", 100)
+	        	.attr("cy", 100)
+	        	.attr("r", 45)
+	        	.style("fill", "green");
+	        
+	        circle1.transition()
+	        	.duration(1000)
+	        	.attr("cx", 300);
+	        
+	        circle1.on("click", function(){
+	        	console.log(d3.event);
+	        });
+			
+        </script> 
+</body>
+</html>
